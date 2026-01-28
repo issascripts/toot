@@ -6,19 +6,25 @@ local Network = require(ReplicatedStorage:WaitForChild("Modules"):WaitForChild("
 local Replication = require(ReplicatedStorage:WaitForChild("Game"):WaitForChild("Replication"))
 
 local EWGG = "Lightning Event"
-local POSITION = Vector3.new(1228, 5380, -13109)
-local BPOSITION = Vector3.new(-435, 15385, 110)
-local HOLOGRAPHIC_POS = Vector3.new(1343, 5342, -13003)
-local CHOSEN = (math.random() < 0.5) and POSITION or BPOSITION
-local LABEL = (CHOSEN == BPOSITION) and "group b" or "group a"
-local HATCH_COOLDOWN = 0.1
-local WEBHOOK_URL = "hhttps://discord.com/api/webhooks/1465873288931573985/7saUqEutsrIYFzZJ0higowWCMa7VxrwH-QtBmjmYIxXleXgYKrVyIx61yp5H0-66K56U"
+local POSITION = Vector3.new(-178, 213, 239)
+local BPOSITION = Vector3.new(-178, 213, 239)
+local HOLOGRAPHIC_POS = Vector3.new(-178, 213, 239)
+local CHOSEN = POSITION
+local LABEL = "group a"
+local HATCH_COOLDOWN = 0.25
+local WEBHOOK_URL = "https://discord.com/api/webhooks/1465873288931573985/7saUqEutsrIYFzZJ0higowWCMa7VxrwH-QtBmjmYIxXleXgYKrVyIx61yp5H0-66K56U"
+local ERROR_WEBHOOK_URL = "https://discord.com/api/webhooks/1465873288931573985/7saUqEutsrIYFzZJ0higowWCMa7VxrwH-QtBmjmYIxXleXgYKrVyIx61yp5H0-66K56U"
 
 local DEEEEBUG = false
 local CONSOLE = false
 local uhoH = false
 
+local sendErrorWebhook
+
 math.randomseed(os.time())
+
+getgenv().autoPressT = true
+local VirtualInputManager = game:GetService("VirtualInputManager")
 
 do
     if CONSOLE == true then
@@ -33,6 +39,26 @@ end
 
 
 local function enable_error_hook(overlay)
+    do
+        local LogService = game:GetService("LogService")
+        local lastErrAt = 0
+        local lastErrMsg = ""
+        LogService.MessageOut:Connect(function(message, messageType)
+            if messageType ~= Enum.MessageType.MessageError then
+                return
+            end
+            local now = os.clock()
+            if message == lastErrMsg and (now - lastErrAt) < 5 then
+                return
+            end
+            lastErrAt = now
+            lastErrMsg = message
+            pcall(function()
+                sendErrorWebhook(tostring(message))
+            end)
+        end)
+    end
+
     local StarterGui = game:GetService("StarterGui")
     local ScriptContext = game:GetService("ScriptContext")
     ScriptContext.Error:Connect(function()
@@ -44,6 +70,9 @@ local function enable_error_hook(overlay)
             overlay.bg.BackgroundColor3 = Color3.fromRGB(120, 0, 0)
             overlay.bg.BackgroundTransparency = 0.3
         end
+        pcall(function()
+            sendErrorWebhook("ScriptContext.Error triggered")
+        end)
         pcall(function()
             StarterGui:SetCore("DevConsoleVisible", true)
         end)
@@ -131,7 +160,7 @@ local function sendWebhook(text)
         return
     end
     local payload = {
-        username = "thething",
+        username = "thething T",
         content = text,
     }
     local body = HttpService:JSONEncode(payload)
@@ -154,6 +183,37 @@ local function sendWebhook(text)
         HttpService:PostAsync(WEBHOOK_URL, body)
     end)
 end
+sendErrorWebhook = function(text)
+    local url = (type(ERROR_WEBHOOK_URL) == "string" and ERROR_WEBHOOK_URL ~= "") and ERROR_WEBHOOK_URL or WEBHOOK_URL
+    if type(url) ~= "string" or url == "" then
+        return
+    end
+    local payload = {
+        username = "Error Logger",
+        content = text,
+    }
+    local body = HttpService:JSONEncode(payload)
+    local req = (syn and syn.request)
+        or (http_request)
+        or (request)
+        or (fluxus and fluxus.request)
+        or (http and http.request)
+    if req then
+        pcall(function()
+            req({
+                Url = url,
+                Method = "POST",
+                Headers = { ["Content-Type"] = "application/json" },
+                Body = body,
+            })
+        end)
+        return
+    end
+    pcall(function()
+        HttpService:PostAsync(url, body)
+    end)
+end
+
 
 while not Replication.Loaded do
     task.wait(0.2)
@@ -246,6 +306,15 @@ task.spawn(function()
 end)
 
 task.spawn(function()
+    while getgenv().autoPressT do
+        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.T, false, game)
+        task.wait()
+        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.T, false, game)
+        task.wait()
+    end
+end)
+
+task.spawn(function()
     while true do
         task.wait(0.25)
         local data = Replication and Replication.Data
@@ -279,7 +348,7 @@ task.spawn(function()
         local lp = Players.LocalPlayer
         local uname = lp and lp.Name or "unknown"
         local hpmText = lastHpmValue and tostring(lastHpmValue) or "--"
-        local msg = string.format("%s | HPM: %s | tptal: %s", uname, hpmText, tostring(eggs))
+        local msg = string.format("%s | HPM: %s | Hatches: %s", uname, hpmText, tostring(eggs))
         sendWebhook(msg)
     end
     while true do
@@ -291,7 +360,7 @@ task.spawn(function()
         local lp = Players.LocalPlayer
         local uname = lp and lp.Name or "unknown"
         local hpmText = lastHpmValue and tostring(lastHpmValue) or "--"
-        local msg = string.format("%s | HPM: %s | total: %s", uname, hpmText, tostring(eggs))
+        local msg = string.format("%s | HPM: %s | Hatches: %s", uname, hpmText, tostring(eggs))
         sendWebhook(msg)
     end
 end)
